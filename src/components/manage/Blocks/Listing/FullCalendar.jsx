@@ -1,17 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useIntl } from 'react-intl';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import listPlugin from '@fullcalendar/list';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import allLocales from '@fullcalendar/core/locales-all';
 import { flattenToAppURL } from '@plone/volto/helpers';
 import { injectLazyLibs } from '@plone/volto/helpers/Loadable/Loadable';
 import config from '@plone/volto/registry';
 import { RRule, rrulestr } from 'rrule';
 import messages from '../FullCalendar/messages';
 
-/* returns all events, computed by the reccurence rule of an Event item */
+// Lazy load FullCalendar and its plugins
+const FullCalendar = lazy(() => import('@fullcalendar/react'));
+const dayGridPlugin = lazy(() => import('@fullcalendar/daygrid'));
+const listPlugin = lazy(() => import('@fullcalendar/list'));
+const timeGridPlugin = lazy(() => import('@fullcalendar/timegrid'));
+const allLocales = lazy(() => import('@fullcalendar/core/locales-all'));
+
+/* returns all events, computed by the recurrence rule of an Event item */
 const expand = (item) => {
   let recurrence = item.recurrence;
   if (item.recurrence.indexOf('DTSTART') < 0) {
@@ -44,14 +46,9 @@ const expand = (item) => {
 
 const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
   const intl = useIntl();
-
   const moment = momentlib.default;
   moment.locale(intl.locale);
 
-  /* server-side rendering with FullCalendar does not work here,
-     so we need to render after client-side hydration - as described here:
-     https://gist.github.com/gaearon/e7d97cdf38a2907924ea12e4ebdf3c85#option-2-lazily-show-component-with-uselayouteffect
-  */
   const [isClientSide, setIsClientSide] = useState(false);
 
   useEffect(() => {
@@ -65,7 +62,6 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       if (!i.start) return false;
       if (i.recurrence) {
         recurrences = recurrences.concat(expand(i));
-        /* expand returns initial event as well, so we skip it here */
         return false;
       }
       return true;
@@ -91,11 +87,9 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       end.getHours() === 23 &&
       end.getMinutes() === 59
     ) {
-      /* full day event */
       event.allDay = true;
     }
     if (
-      /* open end event */
       end.getHours() === 23 &&
       end.getMinutes() === 59
     ) {
@@ -132,7 +126,13 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
     ...(config.settings.fullcalendar?.additionalOptions || {}),
   };
 
-  return isClientSide && <FullCalendar events={events} {...fcOptions} />;
+  return (
+    isClientSide && (
+      <Suspense fallback={<div>Loading...</div>}>
+        <FullCalendar events={events} {...fcOptions} />
+      </Suspense>
+    )
+  );
 };
 
 export default injectLazyLibs(['moment'])(FullCalendarListing);
