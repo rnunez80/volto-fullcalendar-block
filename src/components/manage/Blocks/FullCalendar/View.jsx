@@ -1,17 +1,15 @@
-import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useIntl } from 'react-intl';
+import FullCalendar from '@fullcalendar/react';
 import { Dimmer, Loader } from 'semantic-ui-react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import listPlugin from '@fullcalendar/list';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import iCalendarPlugin from '@fullcalendar/icalendar';
+import allLocales from '@fullcalendar/core/locales-all';
 import config from '@plone/volto/registry';
 import './fullcalendar.less';
 import messages from './messages';
-
-// Lazy load FullCalendar and its plugins
-const FullCalendar = lazy(() => import('@fullcalendar/react'));
-const dayGridPlugin = lazy(() => import('@fullcalendar/daygrid'));
-const listPlugin = lazy(() => import('@fullcalendar/list'));
-const timeGridPlugin = lazy(() => import('@fullcalendar/timegrid'));
-const iCalendarPlugin = lazy(() => import('@fullcalendar/icalendar'));
-const allLocales = lazy(() => import('@fullcalendar/core/locales-all'));
 
 /* https://stackoverflow.com/a/43467144 */
 function isValidURL(string) {
@@ -27,6 +25,10 @@ function isValidURL(string) {
 const FullCalendarBlockView = (props) => {
   const intl = useIntl();
 
+  /* server-side rendering with FullCalendar does not work here,
+     so we need to render after client-side hydration - as described here:
+     https://gist.github.com/gaearon/e7d97cdf38a2907924ea12e4ebdf3c85#option-2-lazily-show-component-with-uselayouteffect
+  */
   const [isClientSide, setIsClientSide] = useState(false);
 
   useEffect(() => {
@@ -44,6 +46,10 @@ const FullCalendarBlockView = (props) => {
 
   const calendarRef = useRef(null);
 
+  /* store events in component state after FullCalendar retrieved them initially,
+     otherwise FullCalendar would reload them on every re-render of this component
+     (btw we let FullCalendar do the loading since it handles CORS quite well)
+  */
   const [storedEvents, setStoredEvents] = useState([]);
 
   useEffect(() => {
@@ -52,7 +58,10 @@ const FullCalendarBlockView = (props) => {
     }
   }, [data.calendar_url]);
 
-  let isFullCalendarLoading = false;
+  /* since FullCalendar fires the `loading` callback multiple times
+     we need to introduce this flag to avoid prematurely switching to `storedEvents`:
+  */
+  var isFullCalendarLoading = false;
 
   const onLoading = (isLoading) => {
     if (isLoading === false) {
@@ -73,8 +82,8 @@ const FullCalendarBlockView = (props) => {
     plugins: [dayGridPlugin, iCalendarPlugin, listPlugin, timeGridPlugin],
     buttonText: {
       dayGridMonth: intl.formatMessage(messages.labelDayGridMonth),
-      timeGridWeek: intl.formatMessage(messages.labelDayGridWeek),
-      timeGridDay: intl.formatMessage(messages.labelDayGridDay),
+      timeGridWeek: intl.formatMessage(messages.labelTimeGridWeek),
+      timeGridDay: intl.formatMessage(messages.labelTimeGridDay),
       listDay: intl.formatMessage(messages.labelListDay),
       listWeek: intl.formatMessage(messages.labelListWeek),
       listMonth: intl.formatMessage(messages.labelListMonth),
@@ -99,22 +108,26 @@ const FullCalendarBlockView = (props) => {
   return (
     isClientSide && (
       <div className="calendar-wrapper">
-        <Suspense fallback={<Dimmer active inverted><Loader inverted size='massive' /></Dimmer>}>
-          {storedEvents === null ? (
+        {storedEvents === null && (
+          <>
+            <Dimmer active inverted>
+              <Loader inverted size='massive' />
+            </Dimmer>
             <FullCalendar
               ref={calendarRef}
               events={remoteEvents}
-              loading={onLoading}
+              loading={(isLoading) => onLoading(isLoading)}
               {...fcOptions}
             />
-          ) : (
-            <FullCalendar
-              ref={calendarRef}
-              events={storedEvents}
-              {...fcOptions}
-            />
-          )}
-        </Suspense>
+          </>
+        )}
+        {storedEvents !== null && (
+          <FullCalendar
+            ref={calendarRef}
+            events={storedEvents}
+            {...fcOptions}
+          />
+        )}
       </div>
     )
   );
