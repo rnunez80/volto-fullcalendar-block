@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { Loader } from 'semantic-ui-react';
 
 // Lazy load the components using different internal names
 const LazyFullCalendarBlockEdit = React.lazy(() => import('./manage/Blocks/FullCalendar/Edit'));
@@ -8,6 +9,7 @@ const LazyFullCalendarListing = React.lazy(() => import('./manage/Blocks/Listing
 // Create fallback component for Suspense
 const LoadingFallback = () => (
   <div>
+    <Loader active inline='centered' />
     <p>Loading...</p>
   </div>
 );
