@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { UniversalLink } from '@plone/volto/components';
 import { useIntl } from 'react-intl';
 import FullCalendar from '@fullcalendar/react';
 import { Dimmer, Loader } from 'semantic-ui-react';
@@ -39,9 +40,9 @@ const FullCalendarBlockView = (props) => {
   const remoteEvents =
     data.calendar_url && isValidURL(data.calendar_url)
       ? {
-          url: data.calendar_url,
-          format: 'ics',
-        }
+        url: data.calendar_url,
+        format: 'ics',
+      }
       : {};
 
   const calendarRef = useRef(null);
@@ -89,10 +90,128 @@ const FullCalendarBlockView = (props) => {
       listMonth: intl.formatMessage(messages.labelListMonth),
       today: intl.formatMessage(messages.labelToday),
     },
+    buttonHints: {
+      prev: intl.formatMessage(messages.labelPrev),
+      next: intl.formatMessage(messages.labelNext),
+    },
     headerToolbar: {
       left: data.toolbar_left?.join(','),
       center: data.toolbar_center?.join(','),
       right: data.toolbar_right?.join(','),
+    },
+    viewDidMount: (arg) => {
+      const headers = arg.el.querySelectorAll('th');
+      headers.forEach((th) => th.setAttribute('scope', 'col'));
+      const links = arg.el.querySelectorAll('a');
+      links.forEach((link) => {
+        if (
+          link.classList.contains('fc-col-header-cell-cushion') ||
+          link.classList.contains('fc-daygrid-day-number')
+        ) {
+          const span = document.createElement('span');
+          span.innerHTML = link.innerHTML;
+          span.className = link.className;
+          link.parentNode.replaceChild(span, link);
+        }
+      });
+      const tables = arg.el.querySelectorAll('table');
+      tables.forEach((table) => {
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        if (thead && tbody) {
+          const ths = thead.querySelectorAll('th');
+          const trs = tbody.querySelectorAll('tr');
+          if (trs.length > 0) {
+            const tds = trs[0].querySelectorAll('td');
+            if (ths.length !== tds.length) {
+              // Mismatch detected. Attempt heuristic fix.
+              // Often FullCalendar uses a spacer cell or similar.
+              // If ths < tds, we might need a colspan on the last th, or an extra th.
+              // If ths > tds, we might need a colspan on the last td, or an extra td.
+              if (ths.length < tds.length) {
+                const diff = tds.length - ths.length;
+                const lastTh = ths[ths.length - 1];
+                if (lastTh) {
+                  const currentColSpan = parseInt(lastTh.getAttribute('colspan') || '1', 10);
+                  lastTh.setAttribute('colspan', currentColSpan + diff);
+                }
+              }
+            }
+          }
+        }
+      });
+    },
+    viewDidUpdate: (arg) => {
+      const headers = arg.el.querySelectorAll('th');
+      headers.forEach((th) => th.setAttribute('scope', 'col'));
+      const links = arg.el.querySelectorAll('a');
+      links.forEach((link) => {
+        if (
+          link.classList.contains('fc-col-header-cell-cushion') ||
+          link.classList.contains('fc-daygrid-day-number')
+        ) {
+          const span = document.createElement('span');
+          span.innerHTML = link.innerHTML;
+          span.className = link.className;
+          link.parentNode.replaceChild(span, link);
+        }
+      });
+      const tables = arg.el.querySelectorAll('table');
+      tables.forEach((table) => {
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        if (thead && tbody) {
+          const ths = thead.querySelectorAll('th');
+          const trs = tbody.querySelectorAll('tr');
+          if (trs.length > 0) {
+            const tds = trs[0].querySelectorAll('td');
+            if (ths.length !== tds.length) {
+              if (ths.length < tds.length) {
+                const diff = tds.length - ths.length;
+                const lastTh = ths[ths.length - 1];
+                if (lastTh) {
+                  const currentColSpan = parseInt(lastTh.getAttribute('colspan') || '1', 10);
+                  lastTh.setAttribute('colspan', currentColSpan + diff);
+                }
+              }
+            }
+          }
+        }
+      });
+    },
+    moreLinkContent: (arg) => {
+      return (
+        <span aria-label={`Show ${arg.num} more events`}>
+          {arg.shortText}
+        </span>
+      );
+    },
+    eventDataTransform: (eventData) => {
+      if (eventData.url) {
+        eventData.linkUrl = eventData.url;
+        delete eventData.url;
+      }
+      return eventData;
+    },
+    eventContent: (arg) => {
+      const url =
+        arg.event.extendedProps.linkUrl ||
+        arg.event.extendedProps.url ||
+        arg.event.url;
+      const content = (
+        <>
+          {arg.timeText && <div className="fc-event-time">{arg.timeText}</div>}
+          <div className="fc-event-title">{arg.event.title}</div>
+        </>
+      );
+
+      if (!url) return content;
+
+      return (
+        <UniversalLink href={url} aria-label={`Event: ${arg.event.title}`}>
+          {content}
+        </UniversalLink>
+      );
     },
     initialView: data.initial_view ?? 'dayGridMonth',
     titleFormat: {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { UniversalLink } from '@plone/volto/components';
 import { useIntl } from 'react-intl';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -36,7 +37,7 @@ const expand = (item) => {
       title: item.title,
       start: startStr,
       end: endStr,
-      url: flattenToAppURL(item['@id']),
+      linkUrl: flattenToAppURL(item['@id']),
       groupId: item['@id'],
     };
   });
@@ -76,7 +77,7 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
         title: i.title,
         start: i.start,
         end: i.end || false,
-        url: flattenToAppURL(i['@id']),
+        linkUrl: flattenToAppURL(i['@id']),
       };
     });
 
@@ -116,10 +117,49 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       listMonth: intl.formatMessage(messages.labelListMonth),
       today: intl.formatMessage(messages.labelToday),
     },
+    buttonHints: {
+      prev: intl.formatMessage(messages.labelPrev),
+      next: intl.formatMessage(messages.labelNext),
+    },
     headerToolbar: {
       left: props.toolbar_left?.join(','),
       center: props.toolbar_center?.join(','),
       right: props.toolbar_right?.join(','),
+    },
+    viewDidMount: (arg) => {
+      const headers = arg.el.querySelectorAll('th');
+      headers.forEach((th) => th.setAttribute('scope', 'col'));
+    },
+    viewDidUpdate: (arg) => {
+      const headers = arg.el.querySelectorAll('th');
+      headers.forEach((th) => th.setAttribute('scope', 'col'));
+    },
+    moreLinkContent: (arg) => {
+      return (
+        <span aria-label={`Show ${arg.num} more events`}>
+          {arg.shortText}
+        </span>
+      );
+    },
+    eventContent: (arg) => {
+      const url =
+        arg.event.extendedProps.linkUrl ||
+        arg.event.extendedProps.url ||
+        arg.event.url;
+      const content = (
+        <>
+          {arg.timeText && <div className="fc-event-time">{arg.timeText}</div>}
+          <div className="fc-event-title">{arg.event.title}</div>
+        </>
+      );
+
+      if (!url) return content;
+
+      return (
+        <UniversalLink href={url} aria-label={`Event: ${arg.event.title}`}>
+          {content}
+        </UniversalLink>
+      );
     },
     initialView: props.initial_view ?? 'dayGridMonth',
     titleFormat: {
