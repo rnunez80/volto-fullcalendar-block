@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { UniversalLink } from '@plone/volto/components';
 import { useIntl } from 'react-intl';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -37,7 +36,7 @@ const expand = (item) => {
       title: item.title,
       start: startStr,
       end: endStr,
-      linkUrl: flattenToAppURL(item['@id']),
+      url: flattenToAppURL(item['@id']),
       groupId: item['@id'],
     };
   });
@@ -77,7 +76,7 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
         title: i.title,
         start: i.start,
         end: i.end || false,
-        linkUrl: flattenToAppURL(i['@id']),
+        url: flattenToAppURL(i['@id']),
       };
     });
 
@@ -117,49 +116,10 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       listMonth: intl.formatMessage(messages.labelListMonth),
       today: intl.formatMessage(messages.labelToday),
     },
-    buttonHints: {
-      prev: intl.formatMessage(messages.labelPrev),
-      next: intl.formatMessage(messages.labelNext),
-    },
     headerToolbar: {
       left: props.toolbar_left?.join(','),
       center: props.toolbar_center?.join(','),
       right: props.toolbar_right?.join(','),
-    },
-    viewDidMount: (arg) => {
-      const headers = arg.el.querySelectorAll('th');
-      headers.forEach((th) => th.setAttribute('scope', 'col'));
-    },
-    viewDidUpdate: (arg) => {
-      const headers = arg.el.querySelectorAll('th');
-      headers.forEach((th) => th.setAttribute('scope', 'col'));
-    },
-    moreLinkContent: (arg) => {
-      return (
-        <span aria-label={`Show ${arg.num} more events`}>
-          {arg.shortText}
-        </span>
-      );
-    },
-    eventContent: (arg) => {
-      const url =
-        arg.event.extendedProps.linkUrl ||
-        arg.event.extendedProps.url ||
-        arg.event.url;
-      const content = (
-        <>
-          {arg.timeText && <div className="fc-event-time">{arg.timeText}</div>}
-          <div className="fc-event-title">{arg.event.title}</div>
-        </>
-      );
-
-      if (!url) return content;
-
-      return (
-        <UniversalLink href={url} aria-label={`Event: ${arg.event.title}`}>
-          {content}
-        </UniversalLink>
-      );
     },
     initialView: props.initial_view ?? 'dayGridMonth',
     titleFormat: {
@@ -169,7 +129,47 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
     },
     locales: allLocales,
     locale: intl.locale ?? 'en',
+    didMount: (info) => {
+      applyAccessibilityFixes(info.el);
+    },
+    viewDidMount: (info) => {
+      applyAccessibilityFixes(info.el);
+    },
     ...(config.settings.fullcalendar?.additionalOptions || {}),
+  };
+
+  // Helper function to apply accessibility fixes to the calendar
+  const applyAccessibilityFixes = (calendarEl) => {
+    // Add scope attributes and unique IDs to table headers for accessibility
+    const tableHeaders = calendarEl.querySelectorAll('th');
+    tableHeaders.forEach((th, index) => {
+      if (!th.hasAttribute('scope')) {
+        th.setAttribute('scope', 'col');
+      }
+      // Always ensure a unique ID exists, even for aria-hidden headers
+      if (!th.id || th.id === '') {
+        const uniqueId = `fc-header-${Math.random().toString(36).substr(2, 9)}-${index}`;
+        th.setAttribute('id', uniqueId);
+      }
+    });
+
+    // Fix non-functional anchor tags (links without href) for screen reader accessibility
+    const nonFunctionalLinks = calendarEl.querySelectorAll('a:not([href])');
+    nonFunctionalLinks.forEach((link) => {
+      // Create a span element to replace the anchor
+      const span = document.createElement('span');
+
+      // Copy all attributes from the anchor to the span
+      Array.from(link.attributes).forEach((attr) => {
+        span.setAttribute(attr.name, attr.value);
+      });
+
+      // Copy the content
+      span.innerHTML = link.innerHTML;
+
+      // Replace the anchor with the span
+      link.parentNode.replaceChild(span, link);
+    });
   };
 
   return isClientSide && <FullCalendar events={events} {...fcOptions} />;
