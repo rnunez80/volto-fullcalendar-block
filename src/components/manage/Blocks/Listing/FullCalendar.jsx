@@ -193,11 +193,81 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       // Disconnect temporarily to avoid infinite loop when we modify the DOM
       observer.disconnect();
       fixAnchors();
+      fixRedundantTables();
       observer.observe(calendarEl, {
         childList: true,
         subtree: true,
       });
     });
+
+    // Handle redundant one-column tables by turning them into lists semantically
+    const fixRedundantTables = () => {
+      // Find all tables, including those within fc-scroller or fc-scrollgrid
+      const tables = calendarEl.querySelectorAll('table');
+      tables.forEach((table) => {
+        // If it's already marked as a list, skip it (avoid double processing)
+        if (table.getAttribute('role') === 'list') return;
+
+        // Find all rows in the table
+        const rows = Array.from(table.querySelectorAll('tr'));
+        if (rows.length === 0) return;
+
+        // Check if the table is effectively a single-column table
+        let maxCells = 0;
+        rows.forEach((row) => {
+          const cells = row.querySelectorAll('td, th');
+          if (cells.length > maxCells) {
+            maxCells = cells.length;
+          }
+        });
+
+        const isScrollerTable = table.closest('.fc-scroller') !== null;
+        const isScrollgrid = table.classList.contains('fc-scrollgrid');
+
+        if (maxCells <= 1 || (maxCells > 0 && (isScrollerTable || isScrollgrid) && rows.length > 0)) {
+          if (maxCells <= 1) {
+            table.setAttribute('role', 'list');
+            table.removeAttribute('aria-labelledby');
+
+            rows.forEach((row) => {
+              const cells = row.querySelectorAll('td, th');
+              if (cells.length === 1) {
+                row.setAttribute('role', 'listitem');
+                cells[0].setAttribute('role', 'presentation');
+              } else if (cells.length === 0) {
+                row.setAttribute('role', 'presentation');
+              }
+            });
+          }
+        }
+      });
+
+      // Special handling for the main scrollgrid if it's being problematic
+      const scrollGrids = calendarEl.querySelectorAll('.fc-scrollgrid');
+      scrollGrids.forEach((grid) => {
+        const topLevelRows = grid.querySelectorAll(':scope > tbody > tr, :scope > thead > tr');
+        if (topLevelRows.length > 0) {
+          let isSingleColGrid = true;
+          topLevelRows.forEach(row => {
+            if (row.querySelectorAll(':scope > td, :scope > th').length > 1) {
+              isSingleColGrid = false;
+            }
+          });
+
+          if (isSingleColGrid) {
+            grid.setAttribute('role', 'list');
+            topLevelRows.forEach(row => {
+              row.setAttribute('role', 'listitem');
+              const cell = row.querySelector(':scope > td, :scope > th');
+              if (cell) cell.setAttribute('role', 'presentation');
+            });
+          }
+        }
+      });
+    };
+
+    fixAnchors();
+    fixRedundantTables();
 
     observer.observe(calendarEl, {
       childList: true,
