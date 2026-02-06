@@ -153,22 +153,55 @@ const FullCalendarListing = ({ items, moment: momentlib, ...props }) => {
       }
     });
 
-    // Fix non-functional anchor tags (links without href) for screen reader accessibility
-    const nonFunctionalLinks = calendarEl.querySelectorAll('a:not([href])');
-    nonFunctionalLinks.forEach((link) => {
-      // Create a span element to replace the anchor
-      const span = document.createElement('span');
+    // Handle non-functional anchor tags (links without href)
+    const fixAnchors = () => {
+      const nonFunctionalLinks = calendarEl.querySelectorAll('a:not([href])');
+      nonFunctionalLinks.forEach((link) => {
+        const parent = link.parentElement;
+        if (!parent) return;
 
-      // Copy all attributes from the anchor to the span
-      Array.from(link.attributes).forEach((attr) => {
-        span.setAttribute(attr.name, attr.value);
+        // Check if there's already a span with the same content in the same container
+        const spans = Array.from(parent.querySelectorAll('span'));
+        const matchingSpan = spans.find(
+          (span) => span.textContent.trim() === link.textContent.trim(),
+        );
+
+        if (matchingSpan) {
+          // If a span already exists, transfer the ID if the span doesn't have one
+          if (link.id && !matchingSpan.id) {
+            matchingSpan.id = link.id;
+          }
+          // Remove the redundant anchor
+          link.remove();
+        } else {
+          // If no span exists, convert the anchor to a span to preserve the content
+          const span = document.createElement('span');
+          Array.from(link.attributes).forEach((attr) => {
+            // Include ID when converting, as this replaces the unique element
+            span.setAttribute(attr.name, attr.value);
+          });
+          span.innerHTML = link.innerHTML;
+          link.parentNode.replaceChild(span, link);
+        }
       });
+    };
 
-      // Copy the content
-      span.innerHTML = link.innerHTML;
+    fixAnchors();
 
-      // Replace the anchor with the span
-      link.parentNode.replaceChild(span, link);
+    // Use MutationObserver for dynamic updates, but ensure we don't loop
+    const observer = new MutationObserver((mutations) => {
+      // Disconnect temporarily to avoid infinite loop when we modify the DOM
+      observer.disconnect();
+      fixAnchors();
+      observer.observe(calendarEl, {
+        childList: true,
+        subtree: true,
+      });
+    });
+
+    observer.observe(calendarEl, {
+      childList: true,
+      subtree: true,
     });
   };
 
