@@ -1,12 +1,14 @@
 import React from 'react';
 import { Icon, SidebarPortal } from '@plone/volto/components';
 import calendarSVG from '@plone/volto/icons/calendar.svg';
-import InlineForm from '@plone/volto/components/manage/Form/InlineForm';
+import BlockDataForm from '@plone/volto/components/manage/Form/BlockDataForm';
+import { useIntl } from 'react-intl';
 import FullCalendarBlockView from './View';
 import FullCalendarBlockSchema from './schema';
 
 const FullCalendarBlockEdit = (props) => {
-  const schema = FullCalendarBlockSchema(props.intl);
+  const intl = useIntl();
+  const schema = FullCalendarBlockSchema(intl);
 
   /* we need to set defaults manually for some fields */
   React.useEffect(() => {
@@ -25,7 +27,7 @@ const FullCalendarBlockEdit = (props) => {
   return (
     <>
       <SidebarPortal selected={props.selected}>
-        <InlineForm
+        <BlockDataForm
           schema={schema}
           title={schema.title}
           icon={<Icon name={calendarSVG} />}
